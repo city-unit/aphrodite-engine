@@ -350,13 +350,24 @@ class LlamaForCausalLM(nn.Module):
                     param = param.T
 
                 if is_packed:
-                    shard_size //= self.quant_config.pack_factor
-                    offset //= self.quant_config.pack_factor
+                    if not self.quant_config.get_name() == "squeezellm":
+                        shard_size //= self.quant_config.pack_factor
+                        offset //= self.quant_config.pack_factor
+                        
+               
+                if (self.quant_config is not None
+                        and self.quant_config.get_name() == "squeezellm"
+                        and "lookup_table" not in name):
+                    loaded_weight = loaded_weight[
+                        :, shard_size * tensor_model_parallel_rank:shard_size *
+                        (tensor_model_parallel_rank + 1)]
+                    param_slice = param.data[:, offset:offset + shard_size]
+                else:
+                    loaded_weight = loaded_weight[
+                        shard_size * tensor_model_parallel_rank:shard_size *
+                        (tensor_model_parallel_rank + 1)]
+                    param_slice = param.data[offset:offset + shard_size]
 
-                loaded_weight = loaded_weight[
-                    shard_size * tensor_model_parallel_rank:shard_size *
-                    (tensor_model_parallel_rank + 1)]
-                param_slice = param.data[offset:offset + shard_size]
                 assert param_slice.shape == loaded_weight.shape
 
                 param_slice.copy_(loaded_weight)
@@ -376,12 +387,23 @@ class LlamaForCausalLM(nn.Module):
                 if is_transposed:
                     param = param.T
 
-                shard_size = param.shape[0] // 2
-                loaded_weight = loaded_weight[
-                    shard_size * tensor_model_parallel_rank:shard_size *
-                    (tensor_model_parallel_rank + 1)]
-                param_slice = param.data[shard_size * stride_id:shard_size *
-                                         (stride_id + 1)]
+                if (self.quant_config is not None
+                        and self.quant_config.get_name() == "squeezellm"
+                        and "lookup_table" not in name):
+                    shard_size = param.shape[1] // 2
+                    loaded_weight = loaded_weight[
+                        :, shard_size * tensor_model_parallel_rank:shard_size *
+                        (tensor_model_parallel_rank + 1)]
+                    param_slice = param.data[:, shard_size * stride_id:shard_size *
+                                            (stride_id + 1)]                    
+                else:
+                    shard_size = param.shape[0] // 2
+                    loaded_weight = loaded_weight[
+                        shard_size * tensor_model_parallel_rank:shard_size *
+                        (tensor_model_parallel_rank + 1)]
+                    param_slice = param.data[shard_size * stride_id:shard_size *
+                                            (stride_id + 1)]
+                    
                 assert param_slice.shape == loaded_weight.shape
                 param_slice.copy_(loaded_weight)
                 is_gate_up_weight = True
