@@ -4,84 +4,85 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
-// half tensor
+// half-tensor
 #include <c10/cuda/CUDAStream.h>
 #include <ATen/cuda/CUDATensorMethods.cuh>
 
-// atomicAdd for double precision floating-point numbers on
-// hardware with compute capability < 6.0
+// atomicAdd for double-precision floating-point numbers on hardware with
+// compute capability < 6.0 from:
 // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 600
-__device__ doule atomicAdd(
+__device__ double atomicAdd(
     double* address,
     double val
 ) {
-    unsigned long long int* address_as_ull = (unsigned long long int*)address;
-    unsigned long long int old = *address_as_ull, assumed;
+  unsigned long long int* address_as_ull = (unsigned long long int*)address;
+  unsigned long long int old = *address_as_ull, assumed;
 
-    do {
-        assumed = old;
-        old = atomicCAS(
-            address_as_ull,
-            assumed,
-            __double_as_longlong(val + __longlong_as_double(assumed))
-        );
-    
-    // NOTE: uses integer comparison to avoid hanging in case of NaN (NaN != NaN)
-    } while (assumed != old);
+  do {
+    assumed = old;
+    old = atomicCAS(
+      address_as_ull,
+      assumed,
+      __double_as_longlong(val + __longlong_as_double(assumed))
+    );
 
-    return __longlong_as_double(old);
+  // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+  } while (assumed != old);
+
+  return __longlong_as_double(old);
 }
 #endif
 
 __device__ inline unsigned int as_unsigned(int i) {
-    return *reinterpret_cast<unsigned int*>(&i);
+  return *reinterpret_cast<unsigned int*>(&i);
 }
 
-const int BLOCKWIDTH = 128;
-const int BLOCKHEIGHT3 = 12;
-const int BLOCKHEIGHT4 = 16;
+const int BLOCKWIDTH  = 128;
+const int BLOCKHEIGHT3 =  12;
+const int BLOCKHEIGHT4 =  16;
 
 __global__ void NUQ4MatMulKernel(
-    const half2* __restrict__ vec,
-    const int* __restrict__ mat,
-    half2* __restrict__ mul,
-    const __half* __restrict__ lookup_table,
+    const  half2* __restrict__ vec,
+    const    int* __restrict__ mat,
+           half2* __restrict__ mul,
+    const  __half* __restrict__ lookup_table,
     int height,
     int width,
     int batch,
     int vec_height
 );
 
-// 4bit matvec kernel (LUT-based)
+// 4-bit matvec kernel (LUT-based)
 void squeezellm_gemm(
-    torch::Tensor vec,
-    torch::Tensor mat,
-    torch::Tensor mul,
-    torch::Tensor lookup_table
+  torch::Tensor vec,
+  torch::Tensor mat,
+  torch::Tensor mul,
+  torch::Tensor lookup_table
 ) {
-    int height = mat.size(0);
-    int width = mat.size(1);
+  int height = mat.size(0);
+  int width = mat.size(1);
 
-    int batch = vec.size(0);
-    int vec_height = vec.size(1);
+  int batch = vec.size(0);
+  int vec_height = vec.size(1);
 
-    dim3 blocks(
-        (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4,
-        (width + BLOCKWIDTH - 1) / BLOCKWIDTH
-    );
-    dim3 threads(BLOCKWIDTH);
+  dim3 blocks(
+    (height + BLOCKHEIGHT4 - 1) / BLOCKHEIGHT4,
+    (width + BLOCKWIDTH - 1) / BLOCKWIDTH
+  );
+  dim3 threads(BLOCKWIDTH);
 
-    NUQ4MatMulKernel<<<blocks, threads>>>(
-        (half2*) vec.data<at::Half>(),
-        mat.data_ptr<int>(),
-        (half2*) mul.data<at::Half>(),
-        (__half*) lookup_table.data<at::Half>(),
-        height, width, batch, vec_height
-    );
+  NUQ4MatMulKernel<<<blocks, threads>>>(
+    (half2*) vec.data<at::Half>(),
+    mat.data_ptr<int>(),
+    (half2*) mul.data<at::Half>(),
+    (__half*) lookup_table.data<at::Half>(),
+    height, width, batch, vec_height
+  );
 }
 
-// 4bit matvec kernel (LUT-based)
+
+// 4-bit matvec kernel (LUT-based)
 __global__ void NUQ4MatMulKernel(
     const  half2* __restrict__ vec,
     const    int* __restrict__ mat,
