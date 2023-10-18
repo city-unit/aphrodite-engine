@@ -6,10 +6,13 @@ from aphrodite.modeling.layers.quantized_linear.gptq import(
     GPTQColumnParallelLinear, GPTQRowParallelLinear, GPTQLinear)
 from aphrodite.modeling.megatron.layers import (
     ColumnParallelLinear, RowParallelLinear)
+from aphrodite.modeling.layers.quantized_linear.squeezellm import (
+    SqueezeLLMColumnParallelLinear, SqueezeLLMRowParallelLinear)
 
 _QUANTIZED_LINEAR_REGISTRY = {
     "awq": (AWQColumnParallelLinear, AWQRowParallelLinear, None),
     "gptq": (GPTQColumnParallelLinear, GPTQRowParallelLinear, GPTQLinear),
+    "squeezellm": (SqueezeLLMColumnParallelLinear, SqueezeLLMRowParallelLinear),
 }
 
 

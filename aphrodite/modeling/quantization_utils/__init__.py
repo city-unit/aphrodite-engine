@@ -2,11 +2,13 @@ from typing import Type
 
 from aphrodite.modeling.quantization_utils.awq import AWQConfig
 from aphrodite.modeling.quantization_utils.gptq import GPTQConfig
+from aphrodite.modeling.quantization_utils.squeezellm import SqueezeLLMConfig
 from aphrodite.modeling.quantization_utils.base import QuantizationConfig
 
 _QUANTIZATION_REGISTRY = {
     "awq": AWQConfig,
     "gptq": GPTQConfig,
+    "squeezellm": SqueezeLLMConfig,
 }
 
 
