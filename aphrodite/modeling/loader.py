@@ -25,6 +25,9 @@ _MODEL_CLASSES_SUPPORT_QUANTIZATION = {
     "gptq": [
         LlamaForCausalLM, GPTJForCausalLM, GPTNeoXForCausalLM
     ],
+    "squeezellm": [
+        LlamaForCausalLM
+    ],
 }
 
 
